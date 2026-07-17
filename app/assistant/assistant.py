@@ -8,166 +8,215 @@ from app.core.router import route
 
 
 class Assistant:
-    def __init__(self):
-        print("=" * 50)
-        print("Initializing JARVIS...")
-        print("=" * 50)
 
-        # Initialize all modules
+    def __init__(self):
+
+        print("=" * 60)
+        print("🤖 Initializing JARVIS...")
+        print("=" * 60)
+
+        # ----------------------------------
+        # Initialize Modules
+        # ----------------------------------
+
         self.audio = AudioRecorder()
+
         self.wakeword = WakeWordDetector()
-        self.stt = SpeechToText(model_name="base")
+
+        # Better accuracy than "base"
+        self.stt = SpeechToText(
+            model_name="small"
+        )
+
         self.llm = JarvisLLM()
+
         self.conversation = ConversationManager()
 
         self.tts = TextToSpeech(
             voice="en-IN-PrabhatNeural"
         )
 
-        print("\n✅ All modules loaded successfully!")
+        print("\n✅ All modules initialized successfully.")
+
+    # =====================================================
 
     def wait_for_wake_word(self):
-        """
-        Wait until the wake word is detected.
-        """
+
         print("\n😴 Waiting for wake word...")
 
         self.wakeword.start()
 
         print("\n👂 Wake word detected!")
 
+    # =====================================================
+
     def listen_for_command(self):
-        """
-        Record the user's command.
-        """
-        print("\n🎤 Please speak your command...")
+
+        print("\n🎤 Listening for your command...")
 
         audio_file = self.audio.record(
-            duration=5,
+
+            duration=6,
+
             output_file="temp/command.wav"
+
         )
 
         return audio_file
 
+    # =====================================================
+
     def transcribe(self, audio_file):
-        """
-        Convert speech to text.
-        """
+
         print("\n📝 Transcribing...")
 
         text = self.stt.transcribe(audio_file)
 
-        if text:
-            text = text.strip()
+        if not text:
+
+            return ""
+
+        text = text.strip()
 
         print(f"\n👤 You said: {text}")
 
         return text
 
+    # =====================================================
+
     def think(self, prompt):
-        """
-        Generate an AI response using conversation memory.
-        """
+
         print("\n🧠 Thinking...")
 
-        # Save user message
         self.conversation.add_user_message(prompt)
 
-        # Ask LLM
         response = self.llm.ask(
+
             self.conversation.get_messages()
+
         )
 
-        # Save assistant response
-        self.conversation.add_assistant_message(response)
+        self.conversation.add_assistant_message(
 
-        print(f"\n🤖 Jarvis:\n{response}")
+            response
+
+        )
+
+        print("\n🤖 Jarvis:")
+
+        print(response)
 
         return response
 
+    # =====================================================
+
     def speak(self, response):
-        """
-        Speak the response.
-        """
+
         if not response:
+
             return
 
         print("\n🔊 Speaking...")
 
         self.tts.speak(response)
 
+    # =====================================================
+
     def run(self):
-        """
-        Main JARVIS loop.
-        """
-        print("\n🤖 JARVIS is online!")
+
+        print("\n🚀 JARVIS is Online!")
+
         print("Say the wake word to activate me.\n")
 
         exit_words = [
+
             "exit",
+
             "quit",
+
             "bye",
+
             "goodbye",
+
             "good bye",
-            "stop",
+
             "stop jarvis",
+
             "shutdown jarvis"
+
         ]
 
         while True:
 
             try:
 
-                # Wait for wake word
+                # ----------------------------------
+                # Wait for Wake Word
+                # ----------------------------------
+
                 self.wait_for_wake_word()
 
-                # Listen
+                # ----------------------------------
+                # Record Audio
+                # ----------------------------------
+
                 audio_file = self.listen_for_command()
 
-                # Speech to Text
+                # ----------------------------------
+                # Speech To Text
+                # ----------------------------------
+
                 text = self.transcribe(audio_file)
 
                 if not text:
-                    print("❌ No speech detected.")
+
+                    print("\n❌ No speech detected.")
+
                     continue
 
                 text = text.lower().strip()
 
-                print(f"\n📥 Command Received: {text}")
+                print(f"\n📥 Command : {text}")
 
+                # ----------------------------------
                 # Exit
-                if any(word in text for word in exit_words):
+                # ----------------------------------
+
+                if any(
+
+                    word in text
+
+                    for word in exit_words
+
+                ):
 
                     goodbye = "Goodbye! Have a great day."
 
-                    print("\n👋", goodbye)
+                    print(f"\n👋 {goodbye}")
 
                     self.speak(goodbye)
 
                     break
 
-                # ==========================================
-                # Try Local Command Router First
-                # ==========================================
+                # ----------------------------------
+                # Local Router
+                # ----------------------------------
 
                 response = route(text)
 
-                # ==========================================
-                # If router doesn't understand,
-                # ask the AI model.
-                # ==========================================
+                if response:
 
-                if response is None:
-
-                    print("\n🌐 Routing to LLM...")
-
-                    response = self.think(text)
+                    print("\n⚡ Local command executed.")
 
                 else:
 
-                    print("\n⚡ Local Command Executed")
+                    print("\n🌐 Sending request to AI...")
 
-                # Speak response
+                    response = self.think(text)
+
+                # ----------------------------------
+                # Speak
+                # ----------------------------------
 
                 self.speak(response)
 

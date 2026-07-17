@@ -4,6 +4,7 @@ from app.speech.stt import SpeechToText
 from app.llm.llm import JarvisLLM
 from app.tts.tts import TextToSpeech
 from app.assistant.conversation import ConversationManager
+from app.core.router import route
 
 
 class Assistant:
@@ -56,6 +57,9 @@ class Assistant:
 
         text = self.stt.transcribe(audio_file)
 
+        if text:
+            text = text.strip()
+
         print(f"\n👤 You said: {text}")
 
         return text
@@ -66,10 +70,10 @@ class Assistant:
         """
         print("\n🧠 Thinking...")
 
-        # Add user message to conversation
+        # Save user message
         self.conversation.add_user_message(prompt)
 
-        # Send complete conversation to the LLM
+        # Ask LLM
         response = self.llm.ask(
             self.conversation.get_messages()
         )
@@ -85,6 +89,9 @@ class Assistant:
         """
         Speak the response.
         """
+        if not response:
+            return
+
         print("\n🔊 Speaking...")
 
         self.tts.speak(response)
@@ -96,56 +103,82 @@ class Assistant:
         print("\n🤖 JARVIS is online!")
         print("Say the wake word to activate me.\n")
 
+        exit_words = [
+            "exit",
+            "quit",
+            "bye",
+            "goodbye",
+            "good bye",
+            "stop",
+            "stop jarvis",
+            "shutdown jarvis"
+        ]
+
         while True:
+
             try:
+
                 # Wait for wake word
                 self.wait_for_wake_word()
 
-                # Record command
+                # Listen
                 audio_file = self.listen_for_command()
 
-                # Convert speech to text
+                # Speech to Text
                 text = self.transcribe(audio_file)
 
                 if not text:
                     print("❌ No speech detected.")
                     continue
 
-                text = text.strip().lower()
+                text = text.lower().strip()
 
-                # Exit commands
-                exit_words = [
-                    "exit",
-                    "quit",
-                    "bye",
-                    "goodbye",
-                    "good bye",
-                    "stop",
-                    "stop jarvis",
-                    "shutdown",
-                    "shut down"
-                ]
+                print(f"\n📥 Command Received: {text}")
 
+                # Exit
                 if any(word in text for word in exit_words):
-                    print("\n👋 Goodbye!")
 
-                    self.tts.speak(
-                        "Goodbye! Have a great day."
-                    )
+                    goodbye = "Goodbye! Have a great day."
+
+                    print("\n👋", goodbye)
+
+                    self.speak(goodbye)
 
                     break
 
-                # Generate AI response
-                response = self.think(text)
+                # ==========================================
+                # Try Local Command Router First
+                # ==========================================
+
+                response = route(text)
+
+                # ==========================================
+                # If router doesn't understand,
+                # ask the AI model.
+                # ==========================================
+
+                if response is None:
+
+                    print("\n🌐 Routing to LLM...")
+
+                    response = self.think(text)
+
+                else:
+
+                    print("\n⚡ Local Command Executed")
 
                 # Speak response
+
                 self.speak(response)
 
                 print("\n" + "=" * 60)
 
             except KeyboardInterrupt:
+
                 print("\n👋 Interrupted by user.")
+
                 break
 
             except Exception as e:
+
                 print(f"\n❌ Error: {e}")
